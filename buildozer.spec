@@ -28,8 +28,10 @@ source.exclude_dirs = tests, bin, .buildozer, .github, __pycache__
 version = 1.1.0
 
 # (list) Application requirements
-# 원본 앱 + boto3, requests, urllib3, certifi, charset-normalizer, idna 등 의존성
-requirements = python3,kivy==2.3.0,certifi,charset-normalizer,idna,urllib3,requests,boto3,botocore,jmespath,python-dateutil,s3transfer,six
+# Python 3.11.9 명시 고정 — 3.14가 자동 선택되면 Kivy 2.3.0 Cython 코드가 컴파일 실패함
+# setuptools 명시 — 3.12+에서 distutils 제거되어 명시 필요
+# pyjnius — Android 네이티브 클립보드 접근용
+requirements = python3==3.11.9,hostpython3==3.11.9,kivy==2.3.0,setuptools,certifi,charset-normalizer,idna,urllib3,requests,boto3,botocore,jmespath,python-dateutil,s3transfer,six,pyjnius
 
 # (str) Presplash of the application
 presplash.filename = %(source.dir)s/NotoSansKR.ttf
@@ -65,8 +67,11 @@ android.ndk_api = 24
 android.accept_sdk_license = True
 
 # (list) The Android archs to build for, choices: armeabi-v7a, arm64-v8a, x86, x86_64
-# Note: must be arch=armeabi-v7a or arch=arm64-v8a (or both, comma separated) — multi-arch APK
-android.archs = arm64-v8a, armeabi-v7a
+# 빌드 시간 단축 + 거의 모든 현대 폰은 arm64-v8a 지원하므로 64비트만 빌드
+android.archs = arm64-v8a
+
+# (str) python-for-android branch — 안정성을 위해 master 사용
+p4a.branch = master
 
 # (bool) enables Android auto backup feature (Android API >=23)
 android.allow_backup = True
