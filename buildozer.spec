@@ -25,7 +25,7 @@ source.exclude_exts = spec,md
 source.exclude_dirs = tests, bin, .buildozer, .github, __pycache__
 
 # (str) Application versioning (method 1)
-version = 1.1.0
+version = 1.1.1
 
 # (list) Application requirements
 # Python 3.11.9 명시 고정 — 3.14가 자동 선택되면 Kivy 2.3.0 Cython 코드가 컴파일 실패함

@@ -52,30 +52,37 @@ COLOR_TEXT = get_color_from_hex("#FFFFFF")
 COLOR_TEXT_DIM = get_color_from_hex("#888888")
 
 
-def _replace_ip_in_outline_url(api_url: str, new_ip: str) -> str:
+def _replace_ip_in_url(url: str, new_ip: str) -> str:
     """
-    Outline Management API URL의 호스트(IP) 부분만 new_ip로 교체한다.
-    스킴이 있든 없든, '@'가 있든 없든 안전하게 처리한다.
+    URL에서 '@<host>:<port>' 패턴의 호스트 부분만 new_ip로 교체한다.
+    https://, ss:// 등 모든 스킴 + '@' 가 있는 형식에서 동작.
     실패 시 원본 그대로 반환.
+
+    예:
+      'ss://abc@54.254.69.72:65191/?outline=1' + '47.131.44.210'
+        → 'ss://abc@47.131.44.210:65191/?outline=1'
+      'https://xxx@54.254.69.72:65191/' + '47.131.44.210'
+        → 'https://xxx@47.131.44.210:65191/'
     """
-    from urllib.parse import urlparse
-    if not api_url or not new_ip:
-        return api_url
+    import re
+    if not url or not new_ip:
+        return url
     try:
-        parsed = urlparse(api_url if "://" in api_url else "https://" + api_url)
-        scheme = parsed.scheme or "https"
-        netloc = parsed.netloc
-        userinfo = ""
-        if "@" in netloc:
-            userinfo, _ = netloc.rsplit("@", 1)
-            userinfo += "@"
-        port_str = f":{parsed.port}" if parsed.port else ""
-        path = parsed.path or ""
-        query = f"?{parsed.query}" if parsed.query else ""
-        fragment = f"#{parsed.fragment}" if parsed.fragment else ""
-        return f"{scheme}://{userinfo}{new_ip}{port_str}{path}{query}{fragment}"
+        # @<host>:  → @<new_ip>:  로 교체 (호스트는 :/@ 미포함 문자열)
+        pattern = r'@([^:/@\s?#]+):'
+        new_url, n = re.subn(pattern, f'@{new_ip}:', url, count=1)
+        if n > 0:
+            return new_url
+        # '@'가 없는 URL의 경우 (예: 'https://1.2.3.4:5/path')
+        pattern2 = r'(://)([^:/@\s?#]+)(:|/|$)'
+        new_url, n = re.subn(pattern2, lambda m: f"{m.group(1)}{new_ip}{m.group(3)}", url, count=1)
+        return new_url if n > 0 else url
     except Exception:
-        return api_url
+        return url
+
+
+# 기존 이름 유지 (이전 코드 호환)
+_replace_ip_in_outline_url = _replace_ip_in_url
 
 
 class OutlineVPNApp(App):
@@ -630,13 +637,13 @@ class OutlineVPNApp(App):
         self.lbl_progress.color = COLOR_SUCCESS
         self.lbl_ip.text = result.new_ip
 
-        # ★ 신규 기능: Outline API URL 의 IP 부분을 자동 교체하여 입력 위젯에도 반영
+        # ★ 신규 기능 1: Outline API URL 의 IP 부분을 자동 교체하여 입력 위젯에도 반영
         try:
             old_url = self.input_api_url.text if self.input_api_url else ""
             if not old_url:
                 # 입력 위젯이 비었다면 config에서 다시 가져옴 (update_current_ip 가 이미 갱신했음)
                 old_url = self.config_mgr.get_outline_config().get("api_url", "")
-            new_url = _replace_ip_in_outline_url(old_url, result.new_ip)
+            new_url = _replace_ip_in_url(old_url, result.new_ip)
             if new_url:
                 self.input_api_url.text = new_url
                 # config 도 한 번 더 정합성 맞춤
@@ -646,6 +653,16 @@ class OutlineVPNApp(App):
                 self.lbl_save_result.text = "Outline API URL이 새 IP로 갱신되었습니다. 설정 탭에서 [API URL 복사]를 누르세요."
                 self.lbl_save_result.color = COLOR_SUCCESS
                 Clock.schedule_once(lambda dt: setattr(self.lbl_save_result, "text", ""), 6)
+        except Exception:
+            pass
+
+        # ★ 신규 기능 2: 액세스 키의 ss:// URL 중 @~: 사이 IP 도 새 IP 로 강제 교체
+        # (Outline 서버 hostname 캐시가 옛 IP일 가능성 대비 — 클라이언트에서 안전하게 보정)
+        try:
+            if result.new_ip and access_keys:
+                for key in access_keys:
+                    if getattr(key, 'access_url', None):
+                        key.access_url = _replace_ip_in_url(key.access_url, result.new_ip)
         except Exception:
             pass
 
