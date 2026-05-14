@@ -49,7 +49,8 @@ fullscreen = 0
 android.permissions = INTERNET, ACCESS_NETWORK_STATE, WAKE_LOCK
 
 # (list) features (adds uses-feature -tags to manifest)
-android.features = android.hardware.wifi
+# 주의: 최신 python-for-android는 --feature 인자를 지원하지 않으므로 주석 처리
+# android.features = android.hardware.wifi
 
 # (int) Target Android API, should be as high as possible.
 android.api = 33
